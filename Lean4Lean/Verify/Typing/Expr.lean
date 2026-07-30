@@ -166,7 +166,7 @@ theorem IsDefEq.appHead_of_const
     (hHead : e₁.appHead = .const C [])
     (hEq : env.IsDefEq U Γ e₁ e₂ A) :
     e₂.appHead = .const C [] := by
-  sorry  -- TODO: Cases on IsDefEq; most cases straightforward, extra needs VDefEq reasoning
+  sorry  -- TODO: Induction on IsDefEq; extra case needs VDefEq reasoning
 
 /-- `appHead` is preserved under definitional equality when head is a constant. -/
 theorem IsDefEqU.appHead_of_const
