@@ -645,9 +645,11 @@ theorem HasType.skips (W : Ctx.LiftN n k Γ Γ')
   IsDefEq.skips henv hΓ' W h1 h2 h2
 
 theorem TrProj.weak'_inv (henv : VEnv.WF env) (hΓ' : OnCtx Γ' (env.IsType U))
-    (W : Ctx.Lift' l Γ Γ') : TrProj Γ' s i (e.lift' l) e' → ∃ e', TrProj Γ s i e e' := by
-  -- TODO: requires showing that e' = e₀.lift' l for some e₀
-  -- This needs lift'_surjective or similar
+    (W : Ctx.Lift' l Γ Γ') : TrProj Γ' s i (e.lift' l) e' → ∃ e₀, TrProj Γ s i e e₀ :=
+  -- TODO: requires decomposing Option.map o f = some y into o = some x ∧ f x = y
+  -- The challenge is that Lean's `cases`/`rcases` on o doesn't substitute into
+  -- hypotheses containing `o.map f` (match expression). Need a custom eliminator
+  -- or different proof structure.
   sorry
 
 theorem TrProj.defeqDFC (henv : VEnv.WF env) (hΓ : env.IsDefEqCtx U [] Γ₁ Γ₂)
