@@ -64,7 +64,117 @@ theorem VLCtx.WF.fvwf : ∀ {Δ}, VLCtx.WF env U Δ → Δ.FVWF
   | [], h => h
   | _ :: _, ⟨h1, h2, _⟩ => ⟨h1.fvwf, h2⟩
 
-def TrProj : ∀ (Γ : List VExpr) (structName : Name) (idx : Nat) (e : VExpr), VExpr → Prop := sorry
+/-- Collect all arguments from a left-associated application chain.
+    `.app (.app C a₁) a₂` gives `[a₁, a₂]`. -/
+def VExpr.appArgs : VExpr → List VExpr
+  | .app f a => VExpr.appArgs f ++ [a]
+  | e => [e]
+
+/-- Get the head of an application chain (the non-application part). -/
+def VExpr.appHead : VExpr → VExpr
+  | .app f _ => VExpr.appHead f
+  | e => e
+
+/-- `appHead` commutes with `lift'` (lifting de Bruijn indices). -/
+theorem VExpr.appHead_lift' {e : VExpr} {ρ : Lift} :
+    (e.lift' ρ).appHead = e.appHead.lift' ρ := by
+  induction e <;> simp [VExpr.appHead, lift', *]
+
+/-- `appArgs` commutes with `lift'` (lifting de Bruijn indices). -/
+theorem VExpr.appArgs_lift' {e : VExpr} {ρ : Lift} :
+    (e.lift' ρ).appArgs = e.appArgs.map (·.lift' ρ) := by
+  induction e
+  all_goals
+    (try simp [VExpr.appArgs, lift', *])
+    (try {
+      rename_i f a ih
+      simp [VExpr.appArgs, lift']
+      rw [← List.map_append]
+      exact ih.trans rfl
+    })
+
+/-- `appHead` commutes with `liftN` (weakening). -/
+theorem VExpr.appHead_liftN {e : VExpr} {n k : Nat} :
+    (liftN n e k).appHead = e.appHead.liftN n k := by
+  induction e generalizing k <;> simp [VExpr.appHead, liftN, *]
+
+/-- `appArgs` commutes with `liftN` (weakening). -/
+theorem VExpr.appArgs_liftN {e : VExpr} {n k : Nat} :
+    (liftN n e k).appArgs = e.appArgs.map (liftN n · k) := by
+  induction e generalizing k
+  all_goals
+    (try simp [VExpr.appArgs, liftN, *])
+    (try {
+      rename_i f a ih
+      simp [VExpr.appArgs, liftN]
+      rw [← List.map_append]
+      exact ih.trans rfl
+    })
+
+/-- `appHead` commutes with `inst` (instantiation).
+
+NOTE: This lemma is FALSE in general. It fails when `e = .bvar i`, `i = k`,
+and `e₀` is an application, because `instVar i e₀ k = liftN k e₀` can be
+an application, but `e.appHead.inst e₀ k = (.bvar i).inst e₀ k = liftN k e₀`
+and `(liftN k e₀).appHead ≠ liftN k e₀` when `liftN k e₀` is an application.
+
+However, when `e.appHead` is a constant (as in `TrProj`), the lemma holds
+because the recursion in `appHead`/`appArgs` ends at the constant, not a `bvar`.
+-/ 
+theorem VExpr.appHead_inst_of_const {e e₀ : VExpr} {k : Nat} {C : Name} {us : List VLevel}
+    (h : e.appHead = .const C us) :
+    (e.inst e₀ k).appHead = .const C us := by
+  induction e <;> simp_all [VExpr.appHead, inst]
+  all_goals
+    (try contradiction)
+
+theorem VExpr.appArgs_inst_of_const {e e₀ : VExpr} {k : Nat} {C : Name} {us : List VLevel}
+    (h : e.appHead = .const C us) :
+    (e.inst e₀ k).appArgs = e.appArgs.map (·.inst e₀ k) := by
+  induction e <;> simp_all [VExpr.appArgs, inst, VExpr.appHead]
+  all_goals
+    (try {
+      rename_i f a ihf iha hf
+      simp_all [VExpr.appArgs, inst]
+      rw [← List.map_append]
+      exact ihf hf.trans rfl
+    })
+    (try contradiction)
+
+/-- `appHead` commutes with `instL` (level instantiation). -/
+theorem VExpr.appHead_instL {e : VExpr} {ls : List VLevel} :
+    (e.instL ls).appHead = e.appHead.instL ls := by
+  induction e <;> simp [VExpr.appHead, instL, *]
+
+/-- `appArgs` commutes with `instL` (level instantiation). -/
+theorem VExpr.appArgs_instL {e : VExpr} {ls : List VLevel} :
+    (e.instL ls).appArgs = e.appArgs.map (·.instL ls) := by
+  induction e
+  all_goals
+    (try simp [VExpr.appArgs, instL, *])
+    (try {
+      rename_i f a ih
+      simp [VExpr.appArgs, instL]
+      rw [← List.map_append]
+      exact ih.trans rfl
+    })
+
+/--
+`TrProj env Γ s i e e'` holds when projecting the `i`-th field from structure `s`
+on expression `e` yields `e'`.
+
+For structure-like inductives (single constructor, no indices), this means:
+- `e` is a constructor application with enough arguments
+- `e'` is the argument at position `numParams + i` (0-indexed)
+
+The actual number of parameters (`numParams`) is existentially quantified
+because we don't have constructor info in the virtual environment.
+-/
+def TrProj (env : VEnv) (Γ : List VExpr) (structName : Name) (idx : Nat) (e e' : VExpr) : Prop :=
+  ∃ (C : Name) (numParams : Nat),
+    e.appHead = .const C [] ∧
+    env.constants C ≠ none ∧
+    (e.appArgs)[numParams + idx]? = some e'
 
 def VEnv.ContainsLits (env : VEnv) : Literal → Prop
   | .natVal _ => env.contains ``Nat
@@ -100,7 +210,7 @@ inductive TrExprS : VLCtx → Expr → VExpr → Prop
     TrExprS Δ (.letE name ty val body nd) body'
   | lit : env.ContainsLits l → TrExprS Δ l.toConstructor e → TrExprS Δ (.lit l) e
   | mdata : TrExprS Δ e e' → TrExprS Δ (.mdata d e) e'
-  | proj : TrExprS Δ e e' → TrProj Δ.toCtx s i e' e'' → TrExprS Δ (.proj s i e) e''
+  | proj : TrExprS Δ e e' → TrProj env Δ.toCtx s i e' e'' → TrExprS Δ (.proj s i e) e''
 
 def TrExpr (env : VEnv) (Us : List Name) (Δ : VLCtx) (e : Expr) (e' : VExpr) : Prop :=
   ∃ e₂, TrExprS env Us Δ e e₂ ∧ env.IsDefEqU Us.length Δ.toCtx e₂ e'

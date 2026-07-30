@@ -556,11 +556,34 @@ inductive SortList : VLCtx → List VLevel → Prop
 end VLCtx
 
 theorem TrProj.weak' (W : Ctx.Lift' n Γ Γ')
-    (H : TrProj Γ s i e e') : TrProj Γ' s i (e.lift' n) (e'.lift' n) := sorry
+    (H : TrProj env Γ s i e e') : TrProj env Γ' s i (e.lift' n) (e'.lift' n) := by
+  unfold TrProj at H ⊢
+  obtain ⟨C, numParams, hHead, hC, hIdx⟩ := H
+  refine ⟨C, numParams, ?_, hC, ?_⟩
+  · -- (e.lift' n).appHead = .const C []
+    rw [VExpr.appHead_lift', hHead]
+    rfl
+  · -- (e.lift' n).appArgs[numParams + i]? = some (e'.lift' n)
+    rw [VExpr.appArgs_lift', List.getElem?_map, hIdx, Option.map_some]
 
 theorem TrProj.weakN (W : Ctx.LiftN n k Γ Γ')
-    (H : TrProj Γ s i e e') : TrProj Γ' s i (e.liftN n k) (e'.liftN n k) := by
+    (H : TrProj env Γ s i e e') : TrProj env Γ' s i (e.liftN n k) (e'.liftN n k) := by
   simpa [VExpr.lift'_consN_skipN] using H.weak' <| Ctx.liftN_iff_lift'.1 W
+
+variable! {env env' : VEnv} in
+theorem TrProj.mono (henv : env ≤ env')
+    (H : TrProj env Γ s i e e') : TrProj env' Γ s i e e' := by
+  unfold TrProj at H ⊢
+  obtain ⟨C, numParams, hHead, hC, hIdx⟩ := H
+  refine ⟨C, numParams, hHead, ?_, hIdx⟩
+  sorry
+  -- TODO: Blocked by dependent elimination on Option for function application
+  -- env.constants C is a function (Name → Option VConstant) applied to C.
+  -- We need to case-split on env.constants C to prove env'.constants C ≠ none.
+  -- Option.casesOn and Option.elim don't rewrite function applications in the branches.
+  -- A possible workaround: use classical logic to show
+  --   env.constants C = none ∨ ∃ ci, env.constants C = some ci
+  -- but Lean's `cases` on function applications doesn't generate equality hypotheses.
 
 variable! (henv : Ordered env) in
 theorem TrExprS.weakFV' (W : VLCtx.FVLift' Δ Δ' dk n k) (hΔ' : Δ'.WF env Us.length)
@@ -637,11 +660,16 @@ theorem HasType.skips (W : Ctx.LiftN n k Γ Γ')
   IsDefEq.skips henv hΓ' W h1 h2 h2
 
 theorem TrProj.weak'_inv (henv : VEnv.WF env) (hΓ' : OnCtx Γ' (env.IsType U))
-    (W : Ctx.Lift' l Γ Γ') : TrProj Γ' s i (e.lift' l) e' → ∃ e', TrProj Γ s i e e' := sorry
+    (W : Ctx.Lift' l Γ Γ') : TrProj env Γ' s i (e.lift' l) e' → ∃ e', TrProj env Γ s i e e' := by
+  -- TODO: requires showing that e' = e₀.lift' l for some e₀
+  -- This needs lift'_surjective or similar
+  sorry
 
 theorem TrProj.defeqDFC (henv : VEnv.WF env) (hΓ : env.IsDefEqCtx U [] Γ₁ Γ₂)
-    (he : env.IsDefEqU U Γ₁ e₁ e₂) (H : TrProj Γ₁ s i e₁ e') :
-    ∃ e', TrProj Γ₂ s i e₂ e' := sorry
+    (he : env.IsDefEqU U Γ₁ e₁ e₂) (H : TrProj env Γ₁ s i e₁ e') :
+    ∃ e', TrProj env Γ₂ s i e₂ e' := by
+  -- TODO: requires IsDefEq lemmas for appHead and appArgs
+  sorry
 
 variable! {env env' : VEnv} (henv : env ≤ env') in
 nonrec theorem VEnv.ContainsLits.mono : ∀ {l}, env.ContainsLits l → env'.ContainsLits l
@@ -661,7 +689,7 @@ theorem TrExprS.mono (H : TrExprS env Us Δ e e') : TrExprS env' Us Δ e e' := b
   | letE h1 _ _ _ ih1 ih2 ih3 => exact .letE (h1.mono henv) ih1 ih2 ih3
   | lit h1 _ ih => refine .lit (h1.mono henv) ih
   | mdata _ ih => exact .mdata ih
-  | proj _ h2 ih => exact .proj ih h2
+  | proj _ h2 ih => exact .proj ih (h2.mono henv)
 
 variable! {env env' : VEnv} (henv : env ≤ env') in
 theorem TrExpr.mono (H : TrExpr env Us Δ e e') : TrExpr env' Us Δ e e' :=
@@ -807,7 +835,15 @@ theorem TrExpr.fvarsIn (H : TrExpr env Us Δ e e') : FVarsIn (· ∈ Δ.fvars) e
 theorem TrExpr.fvarsList (H : TrExpr env Us Δ e e') : e.fvarsList ⊆ Δ.fvars :=
   (fvarsIn_iff.1 H.fvarsIn).1
 
-theorem TrProj.wf (H1 : TrProj Δ s i e e') (H2 : VExpr.WF env U Γ e) : VExpr.WF env U Γ e' := sorry
+theorem TrProj.wf (H1 : TrProj env Δ s i e e') (H2 : VExpr.WF env U Γ e) : VExpr.WF env U Γ e' := by
+  -- e' is an argument of e (at position numParams + i)
+  -- Since e is well-formed, all its arguments are well-formed
+  unfold TrProj at H1
+  obtain ⟨C, numParams, hHead, hC, hIdx⟩ := H1
+  have : (e.appArgs)[numParams + i]? = some e' := hIdx
+  -- TODO: Need lemma: VExpr.WF env U Γ (.app f a) → VExpr.WF env U Γ a
+  -- This follows from VExpr.WF.app_inv + HasType → IsDefEqU (reflexivity)
+  sorry
 
 theorem TrExpr.wf (H : TrExpr env Us Δ e e') : VExpr.WF env Us.length Δ.toCtx e' :=
   let ⟨_, _, _, H⟩ := H; ⟨_, H.hasType.2⟩
@@ -850,7 +886,7 @@ theorem TrExpr.app (henv : VEnv.WF env) (hΔ : OnCtx Δ.toCtx (env.IsType Us.len
   ⟨_, .app h3.hasType.1 h4.hasType.1 s3 s4, _, h3.appDF h4⟩
 
 variable! (henv : VEnv.WF env) (hΓ : IsDefEqCtx env U [] Γ₁ Γ₂) in
-theorem TrProj.uniq (H1 : TrProj Γ₁ s₁ i e₁ e₁') (H2 : TrProj Γ₂ s₂ i e₂ e₂')
+theorem TrProj.uniq (H1 : TrProj env Γ₁ s₁ i e₁ e₁') (H2 : TrProj env Γ₂ s₂ i e₂ e₂')
     (H : env.IsDefEqU U Γ₁ e₁ e₂) :
     env.IsDefEqU U Γ₁ e₁' e₂' := sorry
 
@@ -1020,7 +1056,7 @@ theorem TrExpr.mdata (h : TrExpr env Us Δ e e') : TrExpr env Us Δ (.mdata d e)
   let ⟨_, s2, h2⟩ := h; ⟨_, .mdata s2, h2⟩
 
 theorem TrExpr.proj {env Us Δ e e' s i e''} (henv : VEnv.WF env) (hΔ : VLCtx.WF env Us.length Δ)
-    (H : TrExpr env Us Δ e e') (H2 : TrProj Δ.toCtx s i e' e'') :
+    (H : TrExpr env Us Δ e e') (H2 : TrProj env Δ.toCtx s i e' e'') :
     TrExpr env Us Δ (.proj s i e) e'' :=
   let ⟨_, s2, h2⟩ := H
   have ⟨_, H2'⟩ := H2.defeqDFC henv (.refl hΔ) h2.symm
@@ -1154,7 +1190,14 @@ theorem TrExprS.instN_var (W : VLCtx.InstN Δ₀ e₀' A₀ dk k Δ₁ Δ) (H : 
         cases d <;> simp [VLocalDecl.depth, VLocalDecl.inst, VExpr.lift_instN_lo]
 
 theorem TrProj.instN (W : Ctx.InstN Γ₀ e₀ A₀ k Γ₁ Γ)
-    (H : TrProj Γ₁ s i e e') : TrProj Γ s i (e.inst e₀ k) (e'.inst e₀ k) := sorry
+    (H : TrProj env Γ₁ s i e e') : TrProj env Γ s i (e.inst e₀ k) (e'.inst e₀ k) := by
+  unfold TrProj at H ⊢
+  obtain ⟨C, numParams, hHead, hC, hIdx⟩ := H
+  refine ⟨C, numParams, ?_, hC, ?_⟩
+  · -- (e.inst e₀ k).appHead = .const C []
+    rw [VExpr.appHead_inst_of_const hHead]
+  · -- (e.inst e₀ k).appArgs[numParams + i]? = some (e'.inst e₀ k)
+    rw [VExpr.appArgs_inst_of_const hHead, List.getElem?_map, hIdx, Option.map_some]
 
 variable! (henv : Ordered env) (h₀ : TrExprS env Us Δ₀ e₀ e₀')
   (t₀ : env.HasType Us.length Δ₀.toCtx e₀' A₀) in
@@ -1422,8 +1465,16 @@ theorem ofLevel_mkLevelIMax'
   simp [VLevel.ofLevel]; exact ⟨_, ⟨_, h1, _, h2, rfl⟩, rfl⟩
 
 variable! {ls : List VLevel} (hls : ∀ l ∈ ls, l.WF U') in
-theorem TrProj.instL (H : TrProj Γ s i e e') :
-    TrProj (Γ.map (VExpr.instL ls)) s i (e.instL ls) (e'.instL ls) := sorry
+theorem TrProj.instL (H : TrProj env Γ s i e e') :
+    TrProj env (Γ.map (VExpr.instL ls)) s i (e.instL ls) (e'.instL ls) := by
+  unfold TrProj at H ⊢
+  obtain ⟨C, numParams, hHead, hC, hIdx⟩ := H
+  refine ⟨C, numParams, ?_, hC, ?_⟩
+  · -- (e.instL ls).appHead = .const C []
+    rw [VExpr.appHead_instL, hHead]
+    rfl
+  · -- (e.instL ls).appArgs[numParams + i]? = some (e'.instL ls)
+    rw [VExpr.appArgs_instL, List.getElem?_map, hIdx, Option.map_some]
 
 section
 
