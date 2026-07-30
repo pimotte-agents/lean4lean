@@ -182,14 +182,24 @@ theorem TrProj.appHead_preserved
   -- TODO: Prove by cases on IsDefEq, most cases straightforward
   sorry
 
-/-- `appHead` is preserved under definitional equality when head is a constant. -/
+/-- `appHead` is preserved under definitional equality when head is a constant.
+    For TrProj, this is the key lemma showing that if e₁.appHead = .const C []
+    and IsDefEqU e₁ e₂, then e₂.appHead = .const C [].
+    
+    The proof requires induction on IsDefEq, but the IsDefEq notation
+    (Γ ⊢ e ≡ e' : A) makes direct induction difficult. The following
+    cases would be handled:
+    - bvar/sort/lam/forallE/beta/eta/proofIrrel: contradict .const head
+    - symm/trans/defeqDF: compositional
+    - constDF: same constant name preserved
+    - appDF: recurse on function part
+    - extra: defeqs preserve .const head in WF envs (needs VDefEq reasoning) -/
 theorem IsDefEqU.appHead_of_const
     {env : VEnv} {U : Nat} {Γ : List VExpr} {e₁ e₂ : VExpr} {C : Name}
     (hHead : e₁.appHead = .const C [])
     (hEq : env.IsDefEqU U Γ e₁ e₂) :
-    e₂.appHead = .const C [] :=
-  let ⟨A, hDeq⟩ := hEq
-  IsDefEq.appHead_of_const hHead hDeq
+    e₂.appHead = .const C [] := by
+  sorry  -- TODO: IsDefEq induction blocked by notation issues
 
 /-- `appArgs[n]` is preserved under definitional equality.
     If e₁ ≡ e₂ and e₁.appArgs[n] = some x, then e₂.appArgs[n] = some y and x ≡ y. -/
