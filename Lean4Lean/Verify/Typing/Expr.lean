@@ -165,16 +165,17 @@ theorem IsDefEq.appHead_of_const
     {env : VEnv} {U : Nat} {Γ : List VExpr} {e₁ e₂ : VExpr} {C : Name} {A : VExpr}
     (hHead : e₁.appHead = .const C [])
     (hEq : env.IsDefEq U Γ e₁ e₂ A) :
-    e₂.appHead = .const C [] := by
-  -- Key insight: if e₁.appHead = .const C [], then e₁ is a constructor application.
-  -- Under IsDefEq, the only constructors that preserve application structure are:
-  -- - appDF: f ≡ f', a ≡ a' → .app f a ≡ .app f' a'
-  -- - constDF: .const c ls ≡ .const c ls' (same constant name)
-  -- - beta/eta: only apply to lambdas, not constants
-  -- - extra: defeqs have .const lhs in WF environments
-  -- So if e₁.appHead = .const C [], then e₂.appHead = .const C []
-  sorry  -- TODO: Induction on IsDefEq, most cases are straightforward,
-         -- extra case requires VDefEq structure reasoning
+    e₂.appHead = .const C [] :=
+  -- Proof sketch: by induction on IsDefEq
+  -- - bvar/sort/lam/forallE/beta/eta/proofIrrel: hHead contradicts constructor shape
+  -- - symm: swap and apply IH
+  -- - trans: compose IHs
+  -- - constDF: .const c ls₁.appHead = .const C [] implies c = C, so .const c ls₂.appHead = .const C []
+  -- - appDF: recurse on function part
+  -- - defeqDF: same expression, different type
+  -- - extra: df.lhs.instL ls.appHead = .const C [] implies df.rhs.instL ls.appHead = .const C []
+  --   (in WF environments, defeqs preserve .const head)
+  sorry
 
 /-- `appHead` is preserved under definitional equality when head is a constant. -/
 theorem IsDefEqU.appHead_of_const
