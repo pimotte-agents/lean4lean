@@ -684,10 +684,17 @@ theorem TrProj.weak'_inv (henv : VEnv.WF env) (hΓ' : OnCtx Γ' (env.IsType U))
 theorem TrProj.defeqDFC (henv : VEnv.WF env) (hΓ : env.IsDefEqCtx U [] Γ₁ Γ₂)
     (he : env.IsDefEqU U Γ₁ e₁ e₂) (H : TrProj Γ₁ s i e₁ e') :
     ∃ e', TrProj Γ₂ s i e₂ e' := by
-  -- TODO: requires IsDefEq lemmas for appHead and appArgs:
-  --   IsDefEqU Γ e₁ e₂ → IsDefEqU Γ e₁.appHead e₂.appHead
-  --   IsDefEqU Γ e₁ e₂ → IsDefEqU Γ (e₁.appArgs[n]) (e₂.appArgs[n])
-  -- These require reasoning about definitional equality over application structure.
+  -- Unfold TrProj and extract witnesses
+  unfold TrProj at H
+  obtain ⟨C, numParams, hHead, hIdx⟩ := H
+  -- hHead : e₁.appHead = .const C []
+  -- hIdx : e₁.appArgs[numParams + i]? = some e'
+  -- Use appHead_of_const to show e₂.appHead = .const C []
+  have hHead2 : e₂.appHead = .const C [] := IsDefEqU.appHead_of_const hHead he
+  -- Now we need to find e' such that e₂.appArgs[numParams + i]? = some e'
+  -- and IsDefEqU Γ₁ e' e''
+  -- TODO: Need IsDefEq lemma for appArgs:
+  --   IsDefEqU Γ e₁ e₂ → e₁.appArgs[n]? = some x → ∃ y, e₂.appArgs[n]? = some y ∧ IsDefEqU Γ x y
   sorry
 
 variable! {env env' : VEnv} (henv : env ≤ env') in
@@ -906,10 +913,22 @@ variable! (henv : VEnv.WF env) (hΓ : IsDefEqCtx env U [] Γ₁ Γ₂) in
 theorem TrProj.uniq (H1 : TrProj Γ₁ s₁ i e₁ e₁') (H2 : TrProj Γ₂ s₂ i e₂ e₂')
     (H : env.IsDefEqU U Γ₁ e₁ e₂) :
     env.IsDefEqU U Γ₁ e₁' e₂' := by
-  -- TODO: Requires IsDefEq lemmas for appHead and appArgs:
-  --   IsDefEqU Γ e₁ e₂ → IsDefEqU Γ e₁.appHead e₂.appHead
-  --   IsDefEqU Γ e₁ e₂ → IsDefEqU Γ (e₁.appArgs[n]) (e₂.appArgs[n])
-  -- These require reasoning about definitional equality over application structure.
+  -- Unfold TrProj and extract witnesses
+  unfold TrProj at H1 H2
+  obtain ⟨C₁, numParams₁, hHead₁, hIdx₁⟩ := H1
+  obtain ⟨C₂, numParams₂, hHead₂, hIdx₂⟩ := H2
+  -- From appHead_of_const: e₁.appHead = .const C₁ [] and IsDefEqU e₁ e₂
+  -- implies e₂.appHead = .const C₁ [], so C₁ = C₂
+  have hC : C₁ = C₂ := by
+    have : e₂.appHead = .const C₁ [] := IsDefEqU.appHead_of_const hHead₁ H
+    rw [hHead₂] at this
+    -- .const C₂ [] = .const C₁ [] implies C₂ = C₁
+    cases this
+    <;> rfl
+  -- Now we need to show IsDefEqU e₁' e₂'
+  -- e₁' = e₁.appArgs[numParams₁ + i], e₂' = e₂.appArgs[numParams₂ + i]
+  -- With C₁ = C₂, we have numParams₁ = numParams₂ (same constructor)
+  -- TODO: Need IsDefEq lemma for appArgs to show e₁' and e₂' are defeq
   sorry
 
 variable! (henv : VEnv.WF env) {Us : List Name} (hΔ : VLCtx.IsDefEq env Us.length Δ₁ Δ₂) in

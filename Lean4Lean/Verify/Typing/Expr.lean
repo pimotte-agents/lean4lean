@@ -159,6 +159,25 @@ theorem VExpr.appArgs_instL {e : VExpr} {ls : List VLevel} :
       exact ih.trans rfl
     })
 
+/-- If two expressions are definitionally equal and one has a constant head,
+    the other also has a (definitionally equal) constant head. -/
+theorem IsDefEq.appHead_of_const
+    {env : VEnv} {U : Nat} {Γ : List VExpr} {e₁ e₂ : VExpr} {C : Name} {A : VExpr}
+    (hHead : e₁.appHead = .const C [])
+    (hEq : env.IsDefEq U Γ e₁ e₂ A) :
+    ∃ A', e₂.appHead = .const C [] ∧ env.IsDefEq U Γ (.const C []) (.const C []) A' := by
+  sorry  -- TODO: Complex induction on IsDefEq, requires careful handling of each constructor
+
+/-- `appHead` is preserved under definitional equality when head is a constant. -/
+theorem IsDefEqU.appHead_of_const
+    {env : VEnv} {U : Nat} {Γ : List VExpr} {e₁ e₂ : VExpr} {C : Name}
+    (hHead : e₁.appHead = .const C [])
+    (hEq : env.IsDefEqU U Γ e₁ e₂) :
+    e₂.appHead = .const C [] := by
+  obtain ⟨A, hDeq⟩ := hEq
+  obtain ⟨_, hHead2, _⟩ := IsDefEq.appHead_of_const hHead hDeq
+  exact hHead2
+
 /--
 `TrProj Γ s i e e'` holds when projecting the `i`-th field from structure `s`
 on expression `e` yields `e'`.
