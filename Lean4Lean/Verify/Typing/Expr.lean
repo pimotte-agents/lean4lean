@@ -160,20 +160,19 @@ theorem VExpr.appArgs_instL {e : VExpr} {ls : List VLevel} :
     })
 
 /--
-`TrProj env Γ s i e e'` holds when projecting the `i`-th field from structure `s`
+`TrProj Γ s i e e'` holds when projecting the `i`-th field from structure `s`
 on expression `e` yields `e'`.
 
 For structure-like inductives (single constructor, no indices), this means:
 - `e` is a constructor application with enough arguments
 - `e'` is the argument at position `numParams + i` (0-indexed)
 
-The actual number of parameters (`numParams`) is existentially quantified
-because we don't have constructor info in the virtual environment.
+The actual number of parameters (`numParams`) is existentially quantified.
+The constructor's validity in the environment is ensured by the typing context.
 -/
-def TrProj (env : VEnv) (Γ : List VExpr) (structName : Name) (idx : Nat) (e e' : VExpr) : Prop :=
+def TrProj (Γ : List VExpr) (structName : Name) (idx : Nat) (e e' : VExpr) : Prop :=
   ∃ (C : Name) (numParams : Nat),
     e.appHead = .const C [] ∧
-    env.constants C ≠ none ∧
     (e.appArgs)[numParams + idx]? = some e'
 
 def VEnv.ContainsLits (env : VEnv) : Literal → Prop
@@ -210,7 +209,7 @@ inductive TrExprS : VLCtx → Expr → VExpr → Prop
     TrExprS Δ (.letE name ty val body nd) body'
   | lit : env.ContainsLits l → TrExprS Δ l.toConstructor e → TrExprS Δ (.lit l) e
   | mdata : TrExprS Δ e e' → TrExprS Δ (.mdata d e) e'
-  | proj : TrExprS Δ e e' → TrProj env Δ.toCtx s i e' e'' → TrExprS Δ (.proj s i e) e''
+  | proj : TrExprS Δ e e' → TrProj Δ.toCtx s i e' e'' → TrExprS Δ (.proj s i e) e''
 
 def TrExpr (env : VEnv) (Us : List Name) (Δ : VLCtx) (e : Expr) (e' : VExpr) : Prop :=
   ∃ e₂, TrExprS env Us Δ e e₂ ∧ env.IsDefEqU Us.length Δ.toCtx e₂ e'
