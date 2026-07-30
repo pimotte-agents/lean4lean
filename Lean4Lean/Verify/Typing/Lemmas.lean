@@ -645,12 +645,41 @@ theorem HasType.skips (W : Ctx.LiftN n k Γ Γ')
   IsDefEq.skips henv hΓ' W h1 h2 h2
 
 theorem TrProj.weak'_inv (henv : VEnv.WF env) (hΓ' : OnCtx Γ' (env.IsType U))
-    (W : Ctx.Lift' l Γ Γ') : TrProj Γ' s i (e.lift' l) e' → ∃ e₀, TrProj Γ s i e e₀ :=
-  -- TODO: requires decomposing Option.map o f = some y into o = some x ∧ f x = y
-  -- The challenge is that Lean's `cases`/`rcases` on o doesn't substitute into
-  -- hypotheses containing `o.map f` (match expression). Need a custom eliminator
-  -- or different proof structure.
-  sorry
+    (W : Ctx.Lift' l Γ Γ') : TrProj Γ' s i (e.lift' l) e' → ∃ e₀, TrProj Γ s i e e₀ := by
+  intro H
+  unfold TrProj at H
+  obtain ⟨C, numParams, hHead, hIdx⟩ := H
+  -- hHead : (e.lift' l).appHead = .const C []
+  -- hIdx : (e.lift' l).appArgs[numParams + i]? = some e'
+  -- From appArgs_lift': (e.lift' l).appArgs = e.appArgs.map (·.lift' l)
+  have hArgs : (e.lift' l).appArgs = e.appArgs.map (·.lift' l) := by rw [VExpr.appArgs_lift']
+  rw [hArgs] at hIdx
+  -- hIdx : (e.appArgs.map (·.lift' l))[numParams + i]? = some e'
+  -- By List.getElem?_map: (l.map f)[n]? = l[n]?.map f
+  rw [List.getElem?_map] at hIdx
+  -- hIdx : (e.appArgs[numParams + i]?).map (·.lift' l) = some e'
+  -- Decompose: (o.map f) = some y → ∃ x, o = some x ∧ f x = y
+  have hSome : ∃ x, e.appArgs[numParams + i]? = some x := by
+    classical
+    by_contra h
+    have : e.appArgs[numParams + i]? = none := by
+      rcases (e.appArgs[numParams + i]?) with none | x <;> simp_all
+    rw [this] at hIdx
+    simp [Option.map] at hIdx
+  obtain ⟨e₀, hX⟩ := hSome
+  -- hX : e.appArgs[numParams + i]? = some e₀
+  rw [hX] at hIdx
+  simp [Option.map] at hIdx
+  -- hIdx : e₀.lift' l = e'
+  refine ⟨e₀, C, numParams, ?_, hX⟩
+  -- Show e.appHead = .const C []
+  -- From appHead_lift': (e.lift' l).appHead = e.appHead.lift' l
+  -- So e.appHead.lift' l = .const C []
+  -- Since (.const C []).lift' l = .const C [], by lift'_inj: e.appHead = .const C []
+  have hHead' : e.appHead.lift' l = VExpr.const C [] := by rw [← VExpr.appHead_lift', hHead]
+  have hConst : (VExpr.const C []).lift' l = VExpr.const C [] := by simp
+  rw [← hConst, VExpr.lift'_inj] at hHead'
+  exact hHead'
 
 theorem TrProj.defeqDFC (henv : VEnv.WF env) (hΓ : env.IsDefEqCtx U [] Γ₁ Γ₂)
     (he : env.IsDefEqU U Γ₁ e₁ e₂) (H : TrProj Γ₁ s i e₁ e') :
