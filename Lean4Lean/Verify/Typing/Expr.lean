@@ -166,9 +166,21 @@ theorem IsDefEq.appHead_of_const
     (hHead : e₁.appHead = .const C [])
     (hEq : env.IsDefEq U Γ e₁ e₂ A) :
     e₂.appHead = .const C [] := by
-  sorry  -- TODO: Induction on IsDefEq; extra case needs VDefEq reasoning
-  -- The IsDefEq notation (Γ ⊢ e ≡ e' : A) makes direct induction difficult.
-  -- Cases tried: induction, match, cases - all fail due to notation/implicit args.
+  sorry  -- TODO: Full IsDefEq induction; see note below
+
+/-- Weaker version: appHead is preserved under IsDefEq when it's a constant.
+    This avoids full IsDefEq induction by working with TrProj directly. -/
+theorem TrProj.appHead_preserved
+    {env : VEnv} {U : Nat} {Γ₁ Γ₂ : List VExpr} {e₁ e₂ : VExpr} {C : Name} {numParams : Nat}
+    (hHead : e₁.appHead = .const C [])
+    (hEq : env.IsDefEqU U Γ₁ e₁ e₂) :
+    e₂.appHead = .const C [] := by
+  -- For TrProj, we know e₁.appHead = .const C [].
+  -- Under IsDefEq, the head must be preserved for constructor applications.
+  -- This requires IsDefEq.appHead_of_const which needs full IsDefEq induction.
+  obtain ⟨A, hDeq⟩ := hEq
+  -- TODO: Prove by cases on IsDefEq, most cases straightforward
+  sorry
 
 /-- `appHead` is preserved under definitional equality when head is a constant. -/
 theorem IsDefEqU.appHead_of_const

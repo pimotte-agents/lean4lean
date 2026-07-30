@@ -689,12 +689,12 @@ theorem TrProj.defeqDFC (henv : VEnv.WF env) (hΓ : env.IsDefEqCtx U [] Γ₁ Γ
   obtain ⟨C, numParams, hHead, hIdx⟩ := H
   -- hHead : e₁.appHead = .const C []
   -- hIdx : e₁.appArgs[numParams + i]? = some e'
-  -- Use appHead_of_const to show e₂.appHead = .const C []
-  have hHead2 : e₂.appHead = .const C [] := IsDefEqU.appHead_of_const hHead he
-  -- Use appArgs_of_some to find e'' such that e₂.appArgs[numParams + i]? = some e''
-  obtain ⟨e'', hIdx2, hDeq⟩ := IsDefEqU.appArgs_of_some hIdx he
-  -- Now we have TrProj Γ₂ s i e₂ e''
-  refine ⟨e'', ⟨C, numParams, hHead2, hIdx2⟩⟩
+  -- For TrProj, we need:
+  -- 1. e₂.appHead = .const C [] (appHead preserved under IsDefEq)
+  -- 2. ∃ e'', e₂.appArgs[numParams + i]? = some e'' (appArgs preserved under IsDefEq)
+  -- Both require IsDefEq commutation lemmas which need full IsDefEq induction.
+  -- TODO: Prove IsDefEq.appHead_of_const and IsDefEqU.appArgs_of_some
+  sorry
 
 variable! {env env' : VEnv} (henv : env ≤ env') in
 nonrec theorem VEnv.ContainsLits.mono : ∀ {l}, env.ContainsLits l → env'.ContainsLits l
