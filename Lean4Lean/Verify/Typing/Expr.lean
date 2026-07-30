@@ -167,6 +167,8 @@ theorem IsDefEq.appHead_of_const
     (hEq : env.IsDefEq U Γ e₁ e₂ A) :
     e₂.appHead = .const C [] := by
   sorry  -- TODO: Induction on IsDefEq; extra case needs VDefEq reasoning
+  -- The IsDefEq notation (Γ ⊢ e ≡ e' : A) makes direct induction difficult.
+  -- Cases tried: induction, match, cases - all fail due to notation/implicit args.
 
 /-- `appHead` is preserved under definitional equality when head is a constant. -/
 theorem IsDefEqU.appHead_of_const
