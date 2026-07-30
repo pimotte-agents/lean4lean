@@ -683,7 +683,7 @@ theorem TrProj.weak'_inv (henv : VEnv.WF env) (hΓ' : OnCtx Γ' (env.IsType U))
 
 theorem TrProj.defeqDFC (henv : VEnv.WF env) (hΓ : env.IsDefEqCtx U [] Γ₁ Γ₂)
     (he : env.IsDefEqU U Γ₁ e₁ e₂) (H : TrProj Γ₁ s i e₁ e') :
-    ∃ e', TrProj Γ₂ s i e₂ e' := by
+    ∃ e'', TrProj Γ₂ s i e₂ e'' := by
   -- Unfold TrProj and extract witnesses
   unfold TrProj at H
   obtain ⟨C, numParams, hHead, hIdx⟩ := H
@@ -691,11 +691,10 @@ theorem TrProj.defeqDFC (henv : VEnv.WF env) (hΓ : env.IsDefEqCtx U [] Γ₁ Γ
   -- hIdx : e₁.appArgs[numParams + i]? = some e'
   -- Use appHead_of_const to show e₂.appHead = .const C []
   have hHead2 : e₂.appHead = .const C [] := IsDefEqU.appHead_of_const hHead he
-  -- Now we need to find e' such that e₂.appArgs[numParams + i]? = some e'
-  -- and IsDefEqU Γ₁ e' e''
-  -- TODO: Need IsDefEq lemma for appArgs:
-  --   IsDefEqU Γ e₁ e₂ → e₁.appArgs[n]? = some x → ∃ y, e₂.appArgs[n]? = some y ∧ IsDefEqU Γ x y
-  sorry
+  -- Use appArgs_of_some to find e'' such that e₂.appArgs[numParams + i]? = some e''
+  obtain ⟨e'', hIdx2, hDeq⟩ := IsDefEqU.appArgs_of_some hIdx he
+  -- Now we have TrProj Γ₂ s i e₂ e''
+  refine ⟨e'', ⟨C, numParams, hHead2, hIdx2⟩⟩
 
 variable! {env env' : VEnv} (henv : env ≤ env') in
 nonrec theorem VEnv.ContainsLits.mono : ∀ {l}, env.ContainsLits l → env'.ContainsLits l

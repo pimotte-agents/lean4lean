@@ -165,18 +165,37 @@ theorem IsDefEq.appHead_of_const
     {env : VEnv} {U : Nat} {Γ : List VExpr} {e₁ e₂ : VExpr} {C : Name} {A : VExpr}
     (hHead : e₁.appHead = .const C [])
     (hEq : env.IsDefEq U Γ e₁ e₂ A) :
-    ∃ A', e₂.appHead = .const C [] ∧ env.IsDefEq U Γ (.const C []) (.const C []) A' := by
-  sorry  -- TODO: Complex induction on IsDefEq, requires careful handling of each constructor
+    e₂.appHead = .const C [] := by
+  -- Key insight: if e₁.appHead = .const C [], then e₁ is a constructor application.
+  -- Under IsDefEq, the only constructors that preserve application structure are:
+  -- - appDF: f ≡ f', a ≡ a' → .app f a ≡ .app f' a'
+  -- - constDF: .const c ls ≡ .const c ls' (same constant name)
+  -- - beta/eta: only apply to lambdas, not constants
+  -- - extra: defeqs have .const lhs in WF environments
+  -- So if e₁.appHead = .const C [], then e₂.appHead = .const C []
+  sorry  -- TODO: Induction on IsDefEq, most cases are straightforward,
+         -- extra case requires VDefEq structure reasoning
 
 /-- `appHead` is preserved under definitional equality when head is a constant. -/
 theorem IsDefEqU.appHead_of_const
     {env : VEnv} {U : Nat} {Γ : List VExpr} {e₁ e₂ : VExpr} {C : Name}
     (hHead : e₁.appHead = .const C [])
     (hEq : env.IsDefEqU U Γ e₁ e₂) :
-    e₂.appHead = .const C [] := by
-  obtain ⟨A, hDeq⟩ := hEq
-  obtain ⟨_, hHead2, _⟩ := IsDefEq.appHead_of_const hHead hDeq
-  exact hHead2
+    e₂.appHead = .const C [] :=
+  let ⟨A, hDeq⟩ := hEq
+  IsDefEq.appHead_of_const hHead hDeq
+
+/-- `appArgs[n]` is preserved under definitional equality.
+    If e₁ ≡ e₂ and e₁.appArgs[n] = some x, then e₂.appArgs[n] = some y and x ≡ y. -/
+theorem IsDefEqU.appArgs_of_some
+    {env : VEnv} {U : Nat} {Γ : List VExpr} {e₁ e₂ : VExpr} {n : Nat} {x : VExpr}
+    (hSome : e₁.appArgs[n]? = some x)
+    (hEq : env.IsDefEqU U Γ e₁ e₂) :
+    ∃ y, e₂.appArgs[n]? = some y ∧ env.IsDefEqU U Γ x y := by
+  -- Key insight: appArgs collects arguments from the application chain.
+  -- If e₁ ≡ e₂, then their application structures are similar (up to beta/eta).
+  -- For constructor applications (head = .const), the structure is preserved.
+  sorry  -- TODO: Requires IsDefEq lemmas for appArgs structure
 
 /--
 `TrProj Γ s i e e'` holds when projecting the `i`-th field from structure `s`
