@@ -684,7 +684,10 @@ theorem TrProj.weak'_inv (henv : VEnv.WF env) (hΓ' : OnCtx Γ' (env.IsType U))
 theorem TrProj.defeqDFC (henv : VEnv.WF env) (hΓ : env.IsDefEqCtx U [] Γ₁ Γ₂)
     (he : env.IsDefEqU U Γ₁ e₁ e₂) (H : TrProj Γ₁ s i e₁ e') :
     ∃ e', TrProj Γ₂ s i e₂ e' := by
-  -- TODO: requires IsDefEq lemmas for appHead and appArgs
+  -- TODO: requires IsDefEq lemmas for appHead and appArgs:
+  --   IsDefEqU Γ e₁ e₂ → IsDefEqU Γ e₁.appHead e₂.appHead
+  --   IsDefEqU Γ e₁ e₂ → IsDefEqU Γ (e₁.appArgs[n]) (e₂.appArgs[n])
+  -- These require reasoning about definitional equality over application structure.
   sorry
 
 variable! {env env' : VEnv} (henv : env ≤ env') in
@@ -854,11 +857,9 @@ theorem TrExpr.fvarsList (H : TrExpr env Us Δ e e') : e.fvarsList ⊆ Δ.fvars 
 theorem TrProj.wf (H1 : TrProj Δ s i e e') (H2 : VExpr.WF env U Γ e) : VExpr.WF env U Γ e' := by
   -- e' is an argument of e (at position numParams + i)
   -- Since e is well-formed, all its arguments are well-formed
-  unfold TrProj at H1
-  obtain ⟨C, numParams, hHead, hIdx⟩ := H1
-  have : (e.appArgs)[numParams + i]? = some e' := hIdx
-  -- TODO: Need lemma: VExpr.WF env U Γ (.app f a) → VExpr.WF env U Γ a
-  -- This follows from VExpr.WF.app_inv + HasType → IsDefEqU (reflexivity)
+  -- TODO: Requires VExpr.WF.app_inv which needs Ordered env + OnCtx Γ premises.
+  -- Alternative: Prove HasType Γ e A → IsDefEqU Γ e e (reflexivity) directly.
+  -- Chain: HasType → HasTypeStrong.refl → IsDefEqStrong.defeq → IsDefEq → IsDefEqU
   sorry
 
 theorem TrExpr.wf (H : TrExpr env Us Δ e e') : VExpr.WF env Us.length Δ.toCtx e' :=
@@ -904,7 +905,12 @@ theorem TrExpr.app (henv : VEnv.WF env) (hΔ : OnCtx Δ.toCtx (env.IsType Us.len
 variable! (henv : VEnv.WF env) (hΓ : IsDefEqCtx env U [] Γ₁ Γ₂) in
 theorem TrProj.uniq (H1 : TrProj Γ₁ s₁ i e₁ e₁') (H2 : TrProj Γ₂ s₂ i e₂ e₂')
     (H : env.IsDefEqU U Γ₁ e₁ e₂) :
-    env.IsDefEqU U Γ₁ e₁' e₂' := sorry
+    env.IsDefEqU U Γ₁ e₁' e₂' := by
+  -- TODO: Requires IsDefEq lemmas for appHead and appArgs:
+  --   IsDefEqU Γ e₁ e₂ → IsDefEqU Γ e₁.appHead e₂.appHead
+  --   IsDefEqU Γ e₁ e₂ → IsDefEqU Γ (e₁.appArgs[n]) (e₂.appArgs[n])
+  -- These require reasoning about definitional equality over application structure.
+  sorry
 
 variable! (henv : VEnv.WF env) {Us : List Name} (hΔ : VLCtx.IsDefEq env Us.length Δ₁ Δ₂) in
 theorem TrExprS.uniq (H1 : TrExprS env Us Δ₁ e e₁) (H2 : TrExprS env Us Δ₂ e e₂) :
