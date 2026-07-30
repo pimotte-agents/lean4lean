@@ -165,17 +165,8 @@ theorem IsDefEq.appHead_of_const
     {env : VEnv} {U : Nat} {Γ : List VExpr} {e₁ e₂ : VExpr} {C : Name} {A : VExpr}
     (hHead : e₁.appHead = .const C [])
     (hEq : env.IsDefEq U Γ e₁ e₂ A) :
-    e₂.appHead = .const C [] :=
-  -- Proof sketch: by induction on IsDefEq
-  -- - bvar/sort/lam/forallE/beta/eta/proofIrrel: hHead contradicts constructor shape
-  -- - symm: swap and apply IH
-  -- - trans: compose IHs
-  -- - constDF: .const c ls₁.appHead = .const C [] implies c = C, so .const c ls₂.appHead = .const C []
-  -- - appDF: recurse on function part
-  -- - defeqDF: same expression, different type
-  -- - extra: df.lhs.instL ls.appHead = .const C [] implies df.rhs.instL ls.appHead = .const C []
-  --   (in WF environments, defeqs preserve .const head)
-  sorry
+    e₂.appHead = .const C [] := by
+  sorry  -- TODO: Cases on IsDefEq; most cases straightforward, extra needs VDefEq reasoning
 
 /-- `appHead` is preserved under definitional equality when head is a constant. -/
 theorem IsDefEqU.appHead_of_const
