@@ -3,6 +3,7 @@ import Lean4Lean.Theory.VEnv
 namespace Lean4Lean
 open Lean4Lean
 
+
 inductive Lookup : List VExpr → Nat → VExpr → Prop where
   | zero : Lookup (ty::Γ) 0 ty.lift
   | succ : Lookup Γ n ty → Lookup (A::Γ) (n+1) ty.lift

@@ -4,7 +4,20 @@ import Lean4Lean.Verify.VLCtx
 import Lean4Lean.Verify.Axioms
 
 namespace Lean4Lean
-open Lean
+open Lean VExpr VEnv
+
+/-- Collect all arguments from a left-associated application chain.
+    `.app (.app C a₁) a₂` gives `[a₁, a₂]`. -/
+def VExpr.appArgs : VExpr → List VExpr
+  | .app f a => VExpr.appArgs f ++ [a]
+  | e => [e]
+
+/-- Get the head of an application chain (the non-application part). -/
+def VExpr.appHead : VExpr → VExpr
+  | .app f _ => VExpr.appHead f
+  | e => e
+
+attribute [simp] VExpr.appHead
 
 def Closed : Expr → (k :_:= 0) → Prop
   | .bvar i, k => i < k
@@ -63,17 +76,6 @@ def VLCtx.WF : VLCtx → Prop
 theorem VLCtx.WF.fvwf : ∀ {Δ}, VLCtx.WF env U Δ → Δ.FVWF
   | [], h => h
   | _ :: _, ⟨h1, h2, _⟩ => ⟨h1.fvwf, h2⟩
-
-/-- Collect all arguments from a left-associated application chain.
-    `.app (.app C a₁) a₂` gives `[a₁, a₂]`. -/
-def VExpr.appArgs : VExpr → List VExpr
-  | .app f a => VExpr.appArgs f ++ [a]
-  | e => [e]
-
-/-- Get the head of an application chain (the non-application part). -/
-def VExpr.appHead : VExpr → VExpr
-  | .app f _ => VExpr.appHead f
-  | e => e
 
 /-- `appHead` commutes with `lift'` (lifting de Bruijn indices). -/
 theorem VExpr.appHead_lift' {e : VExpr} {ρ : Lift} :
@@ -159,59 +161,50 @@ theorem VExpr.appArgs_instL {e : VExpr} {ls : List VLevel} :
       exact ih.trans rfl
     })
 
-/-- If two expressions are definitionally equal and one has a constant head,
-    the other also has a (definitionally equal) constant head. -/
+/-- appHead of a constant is preserved under IsDefEq.
+
+    PROOF STRATEGY: Mutual induction (fwd + rev) inside namespace VEnv.
+    - `symm`: fwd calls rev on premise, rev calls fwd on premise
+    - `beta`/`eta`: both directions derive contradiction (.lam ≠ .const)
+    - All other constructors: structural analysis of appHead
+    - `proofIrrel`/`extra`: need additional lemmas about proof-term/defeq heads
+
+    BLOCKED: Cannot define recursive pattern-matching on IsDefEq from outside
+    namespace VEnv (section variables break constructor resolution).
+    Must be proven in Theory/Typing/Lemmas.lean inside `namespace VEnv`. -/
 theorem IsDefEq.appHead_of_const
     {env : VEnv} {U : Nat} {Γ : List VExpr} {e₁ e₂ : VExpr} {C : Name} {A : VExpr}
     (hHead : e₁.appHead = .const C [])
     (hEq : env.IsDefEq U Γ e₁ e₂ A) :
     e₂.appHead = .const C [] := by
-  sorry  -- TODO: Full IsDefEq induction; see note below
-
-/-- Weaker version: appHead is preserved under IsDefEq when it's a constant.
-    This avoids full IsDefEq induction by working with TrProj directly. -/
-theorem TrProj.appHead_preserved
-    {env : VEnv} {U : Nat} {Γ₁ Γ₂ : List VExpr} {e₁ e₂ : VExpr} {C : Name} {numParams : Nat}
-    (hHead : e₁.appHead = .const C [])
-    (hEq : env.IsDefEqU U Γ₁ e₁ e₂) :
-    e₂.appHead = .const C [] := by
-  -- For TrProj, we know e₁.appHead = .const C [].
-  -- Under IsDefEq, the head must be preserved for constructor applications.
-  -- This requires IsDefEq.appHead_of_const which needs full IsDefEq induction.
-  obtain ⟨A, hDeq⟩ := hEq
-  -- TODO: Prove by cases on IsDefEq, most cases straightforward
   sorry
 
-/-- `appHead` is preserved under definitional equality when head is a constant.
-    For TrProj, this is the key lemma showing that if e₁.appHead = .const C []
-    and IsDefEqU e₁ e₂, then e₂.appHead = .const C [].
-    
-    The proof requires induction on IsDefEq, but the IsDefEq notation
-    (Γ ⊢ e ≡ e' : A) makes direct induction difficult. The following
-    cases would be handled:
-    - bvar/sort/lam/forallE/beta/eta/proofIrrel: contradict .const head
-    - symm/trans/defeqDF: compositional
-    - constDF: same constant name preserved
-    - appDF: recurse on function part
-    - extra: defeqs preserve .const head in WF envs (needs VDefEq reasoning) -/
+/-- appHead is preserved under IsDefEqU when head is a constant. -/
 theorem IsDefEqU.appHead_of_const
     {env : VEnv} {U : Nat} {Γ : List VExpr} {e₁ e₂ : VExpr} {C : Name}
     (hHead : e₁.appHead = .const C [])
     (hEq : env.IsDefEqU U Γ e₁ e₂) :
     e₂.appHead = .const C [] := by
-  sorry  -- TODO: IsDefEq induction blocked by notation issues
+  obtain ⟨A, hDeq⟩ := hEq
+  exact IsDefEq.appHead_of_const hHead hDeq
 
-/-- `appArgs[n]` is preserved under definitional equality.
-    If e₁ ≡ e₂ and e₁.appArgs[n] = some x, then e₂.appArgs[n] = some y and x ≡ y. -/
+/-- `appArgs[n]` is preserved under definitional equality when head is a constant.
+    If e₁.appHead = .const C [], e₁ ≡ e₂, and e₁.appArgs[n] = some x,
+    then e₂.appArgs[n] = some y and x ≡ y.
+    
+    The hHead premise is essential: without it, beta reduction could change
+    the appArgs structure (e.g., (.app (.lam A e) e') has 2 appArgs but
+    e.inst e' has 1 appArgs when e is a constant). -/
 theorem IsDefEqU.appArgs_of_some
     {env : VEnv} {U : Nat} {Γ : List VExpr} {e₁ e₂ : VExpr} {n : Nat} {x : VExpr}
+    (hHead : e₁.appHead = .const C [])
     (hSome : e₁.appArgs[n]? = some x)
     (hEq : env.IsDefEqU U Γ e₁ e₂) :
     ∃ y, e₂.appArgs[n]? = some y ∧ env.IsDefEqU U Γ x y := by
-  -- Key insight: appArgs collects arguments from the application chain.
-  -- If e₁ ≡ e₂, then their application structures are similar (up to beta/eta).
-  -- For constructor applications (head = .const), the structure is preserved.
-  sorry  -- TODO: Requires IsDefEq lemmas for appArgs structure
+  -- Key insight: when appHead is .const, the expression is a constructor application.
+  -- Constructor applications have stable appArgs under definitional equality
+  -- because beta/eta reductions don't apply (head is not a lambda).
+  sorry  -- TODO: Induction on IsDefEq with case-by-case reasoning
 
 /--
 `TrProj Γ s i e e'` holds when projecting the `i`-th field from structure `s`

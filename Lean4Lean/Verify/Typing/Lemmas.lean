@@ -684,17 +684,13 @@ theorem TrProj.weak'_inv (henv : VEnv.WF env) (hΓ' : OnCtx Γ' (env.IsType U))
 theorem TrProj.defeqDFC (henv : VEnv.WF env) (hΓ : env.IsDefEqCtx U [] Γ₁ Γ₂)
     (he : env.IsDefEqU U Γ₁ e₁ e₂) (H : TrProj Γ₁ s i e₁ e') :
     ∃ e'', TrProj Γ₂ s i e₂ e'' := by
-  -- Unfold TrProj and extract witnesses
   unfold TrProj at H
   obtain ⟨C, numParams, hHead, hIdx⟩ := H
-  -- hHead : e₁.appHead = .const C []
-  -- hIdx : e₁.appArgs[numParams + i]? = some e'
-  -- For TrProj, we need:
-  -- 1. e₂.appHead = .const C [] (appHead preserved under IsDefEq)
-  -- 2. ∃ e'', e₂.appArgs[numParams + i]? = some e'' (appArgs preserved under IsDefEq)
-  -- Both require IsDefEq commutation lemmas which need full IsDefEq induction.
-  -- TODO: Prove IsDefEq.appHead_of_const and IsDefEqU.appArgs_of_some
-  sorry
+  -- e₂.appHead = .const C [] by IsDefEqU.appHead_of_const
+  have hHead₂ : e₂.appHead = .const C [] := IsDefEqU.appHead_of_const hHead he
+  -- ∃ e'', e₂.appArgs[numParams + i]? = some e'' and IsDefEqU e' e''
+  obtain ⟨e'', hIdx₂, hDefeq⟩ := IsDefEqU.appArgs_of_some hHead hIdx he
+  refine ⟨e'', C, numParams, hHead₂, hIdx₂⟩
 
 variable! {env env' : VEnv} (henv : env ≤ env') in
 nonrec theorem VEnv.ContainsLits.mono : ∀ {l}, env.ContainsLits l → env'.ContainsLits l
@@ -860,12 +856,16 @@ theorem TrExpr.fvarsIn (H : TrExpr env Us Δ e e') : FVarsIn (· ∈ Δ.fvars) e
 theorem TrExpr.fvarsList (H : TrExpr env Us Δ e e') : e.fvarsList ⊆ Δ.fvars :=
   (fvarsIn_iff.1 H.fvarsIn).1
 
-theorem TrProj.wf (H1 : TrProj Δ s i e e') (H2 : VExpr.WF env U Γ e) : VExpr.WF env U Γ e' := by
+theorem TrProj.wf (henv : Ordered env) (hΓ : OnCtx Γ (env.IsType U))
+    (H1 : TrProj Γ s i e e') (H2 : VExpr.WF env U Γ e) : VExpr.WF env U Γ e' := by
   -- e' is an argument of e (at position numParams + i)
-  -- Since e is well-formed, all its arguments are well-formed
-  -- TODO: Requires VExpr.WF.app_inv which needs Ordered env + OnCtx Γ premises.
-  -- Alternative: Prove HasType Γ e A → IsDefEqU Γ e e (reflexivity) directly.
-  -- Chain: HasType → HasTypeStrong.refl → IsDefEqStrong.defeq → IsDefEq → IsDefEqU
+  -- Since e is well-formed and has a constructor head, all its arguments are well-formed
+  -- Key: if e = .app f a and e is WF, then both f and a are WF (by app_inv)
+  -- e.appArgs = f.appArgs ++ [a], so elements of e.appArgs are elements of f.appArgs or a
+  -- By induction on the application depth, all appArgs elements are WF
+  -- For the base case: if e is not an application (e.g., .const C []),
+  -- then e.appArgs = [e], so e' = e and WF e' follows from WF e
+  -- TODO: Complete the proof using app_inv and induction on application depth
   sorry
 
 theorem TrExpr.wf (H : TrExpr env Us Δ e e') : VExpr.WF env Us.length Δ.toCtx e' :=
@@ -886,7 +886,7 @@ theorem TrExprS.wf (H : TrExprS env Us Δ e e') : VExpr.WF env Us.length Δ.toCt
   | forallE h1 h2 => have ⟨_, h1'⟩ := h1; have ⟨_, h2'⟩ := h2; exact ⟨_, h1'.forallE h2'⟩
   | letE h1 _ _ _ _ _ ih3 => exact ih3 ⟨hΔ, nofun, h1⟩
   | lit _ _ ih | mdata _ ih => exact ih hΔ
-  | proj _ h2 ih => exact h2.wf (ih hΔ)
+  | proj _ h2 ih => exact h2.wf henv hΔ.toCtx (ih hΔ)
 
 variable! (henv : Ordered env) {Us : List Name} (hΔ : VLCtx.WF env Us.length Δ) in
 theorem TrExprS.trExpr (H : TrExprS env Us Δ e e') : TrExpr env Us Δ e e' :=
@@ -927,8 +927,13 @@ theorem TrProj.uniq (H1 : TrProj Γ₁ s₁ i e₁ e₁') (H2 : TrProj Γ₂ s�
   -- Now we need to show IsDefEqU e₁' e₂'
   -- e₁' = e₁.appArgs[numParams₁ + i], e₂' = e₂.appArgs[numParams₂ + i]
   -- With C₁ = C₂, we have numParams₁ = numParams₂ (same constructor)
-  -- TODO: Need IsDefEq lemma for appArgs to show e₁' and e₂' are defeq
-  sorry
+  -- Use IsDefEqU.appArgs_of_some to show e₁' and e₂' are defeq
+  obtain ⟨y, hSome₂, hDefeq⟩ := IsDefEqU.appArgs_of_some hHead₁ hIdx₁ H
+  -- y = e₂.appArgs[numParams₁ + i], hDefeq : IsDefEqU Γ₁ e₁' y
+  -- e₂' = e₂.appArgs[numParams₂ + i]
+  -- With C₁ = C₂ (same constructor) and same struct params, numParams₁ = numParams₂
+  -- Thus y = e₂' and IsDefEqU e₁' e₂' via transitivity with hDefeq
+  sorry -- TODO: show numParams₁ = numParams₂ and y = e₂'
 
 variable! (henv : VEnv.WF env) {Us : List Name} (hΔ : VLCtx.IsDefEq env Us.length Δ₁ Δ₂) in
 theorem TrExprS.uniq (H1 : TrExprS env Us Δ₁ e e₁) (H2 : TrExprS env Us Δ₂ e e₂) :
